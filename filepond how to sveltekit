@@ -1,0 +1,350 @@
+<script>
+	import { userStore } from '../../stores/api';
+	import { config } from '../../variables';
+	// import { getCookie } from '../../modules/cookie';
+	import { attach0, attach0add, colors0, deleteimagebutton, getCookie, uniquelisten3 } from '../../stores/api';
+	import { onMount, onDestroy } from 'svelte';
+	import { page } from '$app/stores';
+
+	import * as FilePond from 'filepond';
+	import FilePondPluginImageExifOrientation from 'filepond-plugin-image-exif-orientation';
+	import FilePondPluginImageResize from 'filepond-plugin-image-resize';
+	import FilePondPluginImagePreview from 'filepond-plugin-image-preview';
+	import FilePondPluginImageTransform from 'filepond-plugin-image-transform';
+	import { registerPlugin } from 'filepond';
+	registerPlugin(
+		FilePondPluginImagePreview,
+		FilePondPluginImageExifOrientation,
+		FilePondPluginImageResize,
+		FilePondPluginImageTransform
+	);
+
+	import { customAlphabet } from 'nanoid';
+	import { t, addMessages, locale } from 'svelte-i18n';
+
+	import { writable } from 'svelte/store';
+
+	let inputElement;
+	let pond;
+
+	let url;
+	let yourExportedVarNameHere;
+
+	$: if ($locale == 'en') {
+	} else if ($locale == 'tr') {
+		addMessages('tr', {
+			Drag: 'Sürükle',
+			'Upload Photos': 'Fotoğrafları Yükle',
+			Paste: 'Yapıştır',
+			Browse: 'Göz at',
+			or: 'veya'
+		});
+	}
+
+	if ($page.url.pathname.startsWith('/u/')) {
+		url = config.baseURL + '/api/imagebuttonuser/';
+	}
+
+	if ($page.url.pathname == '/p/add' || $page.url.pathname.startsWith('/p/')) {
+		url = config.baseURL + '/api/imagebutton/';
+	}
+
+	const addToArray = async function sadd(x) {
+
+		$attach0 = [...$attach0, JSON.parse(x)['data']['imageUrl']];
+
+		localStorage.setItem('attach0add', JSON.stringify($attach0));
+	};
+
+
+	function handleRemoveFile(err, fileItem) {
+
+		let cikart
+			if (fileItem.serverId['data']) {
+				cikart = fileItem.serverId['data']['imageUrl']
+			} else {
+				cikart = fileItem.serverId
+			}
+			$attach0 = [...$attach0, cikart];
+			$attach0 = $attach0.filter((t) => t !== cikart);
+
+			localStorage.setItem('attach0add', JSON.stringify($attach0));
+
+			let splitright = cikart.split('_')[1];
+			let splitleft = splitright.split('.')[0];
+			console.log('pursue', cikart, 'after add', splitleft, 'left before');
+			deleteimagebutton(splitleft);
+
+	}
+
+	onMount(() => {
+		
+		// if ($page.url.pathname == '/p/add') {
+		// 		$attach0 = []
+		// 	}
+			
+		pond = FilePond.create(inputElement, {
+			imageResizeTargetWidth: 220,
+			imageResizeTargetHeight: 356,
+			imageTransformOutputQuality: 65,
+			imageTransformOutputQualityMode: 'optional',
+			imageTransformOutputMimeType: 'image/jpeg',
+			imageTransformBeforeCreateBlob: (canvas) =>
+				new Promise((resolve) => {
+					const ctx = canvas.getContext('2d');
+					ctx.font = '24px serif';
+					if (config.name === 'aldolap') {
+						ctx.fillText('Aldolap', 5, 25);
+					}
+					if (config.name === 'bitfinicon') {
+						ctx.fillText('Bitfinicon', 5, 25);
+					}
+
+					// return the blob to the plugin for further processing
+					resolve(canvas);
+				}),
+			imageTransformAfterCreateBlob: (blob) =>
+				new Promise((resolve) => {
+					// 			let file = null;
+					// let blob4 = document.getElementsByTagName('canvas')[0].toBlob(function(blob) {
+					// 				file = new File([blob], 'test.png', { type: 'image/png' });
+					// 			}, 'image/webp')
+					// blob = new File([blob], 'test.png', { type: 'image/webp' })
+					// console.log(blob, "herechangeolready")
+					// blob.lastModifiedDate = Date.now() - Date.now()
+					// blob.imageTransformOutputMimeType = 'image/png'
+					resolve(blob);
+				})
+		});
+
+		// 		pond = FilePond.create({
+		//     imageResizeTargetWidth: 600,
+		// });
+		pond.maxFiles = 4;
+		pond.required = true;
+		// pond.forceRevert = true;
+		// pond.instantUpload = true;
+		// pond.chunkUploads = true;
+		pond.allowMultiple = true;
+
+		pond.allowImageResize = true;
+		pond.imageResizeMode = 'cover';
+		// pond.imageResizeTargetHeight = 356;
+		// pond.imageResizeTargetWidth = 220;
+
+		let filehere2;
+
+		FilePond.setOptions({
+			// onaddfile:handleRemoveFile,
+			onremovefile: handleRemoveFile,
+			server: {
+				// url: config.baseURL + '/fp/',
+
+				process: {
+					url: url,
+					// url: '/',
+					method: 'POST',
+					withCredentials: false,
+					headers: {
+						Authorization: `jwt ${getCookie('jwt')}`
+						// 'Content-Type': 'multipart',
+						// 'Upload-Name': 'asd'
+						// ,'Upload-Length': '99999999999999'
+					},
+					timeout: 7000,
+					onload: (response) => {
+						console.log(99, response);
+						addToArray(response);
+
+						return response;
+					},
+					onerror: null,
+					ondata: (formData) => {
+						// const formData = new FormData();
+						// formData.append('image', pond.getFile().file);
+						const nanoid = customAlphabet('1234567890', 10);
+						console.log(nanoid(), pond.getFiles());
+
+						//might be problem with multiple files, same file error
+						// 						let yuyuyuy
+						// 						let filestransform = webphere(pond.getFiles()[0]).then(res => {
+						// 							yuyuyuy = res;
+						// 							console.log("asd22", yuyuyuy)
+						// })
+						// filestransform
+						formData.append('filepond', filehere2);
+						// console.log(pond.getFiles()[0].file, "ajshdaksj")
+
+						// let b = document.getElementsByTagName('canvas')[0]
+						// let kaka=b.toDataURL('image/webp',0.2);
+						// formData.append('filepond', kaka)
+
+						let file = null;
+						// let blob4 = document.getElementsByTagName('canvas')[0].toBlob(function(blob) {
+						// 				file = new File([blob], 'test.png', { type: 'image/png' });
+						// 				console.log(file, "jajaxxxja", blob)
+						// 				// formData.append('filepond', blob)
+						// 			}, 'image/webp')
+						// formData.append('filepond', file)
+
+						// console.log(file, 'jajaja', pond.getFile().file, 765);
+						// formData.append('filepond', "999");
+						formData.append('unique', nanoid());
+						formData.append('userid', String($userStore._id));
+						// console.log(97, $userStore._id, 99, pond.getFile().name);
+						return formData;
+					}
+				},
+				revert: `./revert`,
+				// load: 'load/?id='
+				// load: {
+				// 	url: config.baseURL + '/media/profilephotos/',
+				// }
+				load: (source, load, error, progress, abort, headers) => {
+					var myRequest = new Request(source);
+					fetch(myRequest).then(function (response) {
+						response.blob().then(function (myBlob) {
+							load(myBlob);
+						});
+					});
+				}
+			}
+		});
+
+		
+	});
+
+	$: if (pond) {
+		pond.labelIdle =
+			$t('Upload Photos') +
+			' (' +
+			$t('Drag') +
+			', ' +
+			$t('Paste') +
+			' ' +
+			$t('or') +
+			` <span class="filepond--label-action">` +
+			$t('Browse') +
+			'</span>)';
+
+
+
+
+		JSON.parse(localStorage.getItem("attach0add")) != undefined ? JSON.parse(localStorage.getItem("attach0add")).length > 0 ? $attach0 = JSON.parse(localStorage.getItem("attach0add")) : "" : "";
+		// if ($page.url.pathname != '/p/add') {
+		
+		checkpic()
+	}
+
+	$: $attach0, checkpic() 
+	// let unique = {};
+	// let uniquelisten3 = {}
+	// $:checkpic()
+	function checkpic() {
+		console.log(99999234234)
+
+		if (pond) {
+		if ($attach0.length == 1) {
+				pond.files = [
+					{
+						source: $attach0[0],
+						options: {
+							type: 'local'
+						}
+					}
+				];
+			} else if ($attach0.length == 2) {
+				pond.files = [
+					{
+						source: $attach0[0],
+						options: {
+							type: 'local'
+						}
+					},
+					{
+						source: $attach0[1],
+						options: {
+							type: 'local'
+						}
+					}
+				];
+			} else if ($attach0.length == 3) {
+				pond.files = [
+					{
+						source: $attach0[0],
+						options: {
+							type: 'local'
+						}
+					},
+					{
+						source: $attach0[1],
+						options: {
+							type: 'local'
+						}
+					},
+					{
+						source: $attach0[2],
+						options: {
+							type: 'local'
+						}
+					}
+				];
+			} else if ($attach0.length == 4) {
+				pond.files = [
+					{
+						source: $attach0[0],
+						options: {
+							type: 'local'
+						}
+					},
+					{
+						source: $attach0[1],
+						options: {
+							type: 'local'
+						}
+					},
+					{
+						source: $attach0[2],
+						options: {
+							type: 'local'
+						}
+					},
+					{
+						source: $attach0[3],
+						options: {
+							type: 'local'
+						}
+					}
+				];
+			}
+		}
+	}
+
+
+
+</script>
+
+<!-- {$attach0}
+{$attach0add} -->
+
+<div>
+	<input
+		class="filepond--item"
+		style="z-index:unset"
+		id="input"
+		type="file"
+		bind:this={inputElement}
+		credits="false"
+	/>
+</div>
+
+
+<style lang="scss" scoped>
+	@import 'filepond/dist/filepond.min.css';
+
+	@import 'filepond-plugin-image-preview/dist/filepond-plugin-image-preview.css';
+
+	.filepond--item {
+		z-index: 0;
+	}
+</style>
